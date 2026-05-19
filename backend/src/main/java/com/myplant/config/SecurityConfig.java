@@ -136,6 +136,7 @@ public class SecurityConfig {
                         ).permitAll()
                         .requestMatchers("/api/plant-care-rules/**").permitAll()
                         .requestMatchers("/api/health").permitAll()
+                        .requestMatchers("/api/ai/**").permitAll()
                         
                         // Health check endpoint (for monitoring)
                         .requestMatchers("/actuator/**").permitAll()

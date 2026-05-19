@@ -48,17 +48,63 @@ export default function AddPlant() {
   }, [])
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    try {
-      await plantsApi.createPlant(form)
-      navigate('/plants')
-    } catch (err) {
-      console.error('Failed to create plant:', err)
-    } finally {
-      setLoading(false)
+
+  e.preventDefault()
+
+  setLoading(true)
+
+  try {
+
+    const payload = {
+      name: form.name,
+      plantType: form.plantType,
+
+      // backend fields
+      potSize: form.soilType || "Medium",
+      isIndoor: true,
+      location: "Home",
+      notes: form.notes,
+
+      // optional
+      customWateringInterval: Number(form.wateringFrequency)
     }
+
+    console.log("Sending Payload:", payload)
+
+    const response = await plantsApi.createPlant(payload)
+
+    console.log("SUCCESS:", response.data)
+
+    alert("Plant added successfully 🌱")
+
+    navigate('/plants')
+
+  } catch (error) {
+
+    console.error("FULL ERROR:", error)
+
+    if (error.response) {
+
+      console.log("Backend Response:", error.response.data)
+
+      alert(
+        error.response.data.message ||
+        JSON.stringify(error.response.data) ||
+        "Backend Error"
+      )
+
+    } else {
+
+      alert("Server Connection Failed")
+
+    }
+
+  } finally {
+
+    setLoading(false)
+
   }
+}
 
   const handleChange = (field, value) => {
     setForm(prev => ({ ...prev, [field]: value }))

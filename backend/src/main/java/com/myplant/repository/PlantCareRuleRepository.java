@@ -4,6 +4,7 @@ import com.myplant.entity.PlantCareRule;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import java.util.Optional;
+import java.util.Optional;
 
 /**
  * Plant Care Rule Repository
@@ -22,6 +23,7 @@ public interface PlantCareRuleRepository extends JpaRepository<PlantCareRule, Lo
      * @return Optional containing the care rule if found
      */
     Optional<PlantCareRule> findByPlantName(String plantName);
+    Optional<PlantCareRule> findByPlantNameIgnoreCase(String plantName);
 
     /**
      * Check if a plant care rule exists

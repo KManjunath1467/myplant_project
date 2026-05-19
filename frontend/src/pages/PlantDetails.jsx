@@ -171,7 +171,7 @@ export default function PlantDetails() {
                         <Sun className="w-5 h-5 text-yellow-600" />
                         <div>
                           <div className="text-sm text-gray-600">Sunlight</div>
-                          <div className="font-semibold">{plant.sunlightRequirement || 'Not specified'}</div>
+                          <div className="font-semibold">{plant.sunlightNeeds || 'Not specified'}</div>
                         </div>
                       </div>
 

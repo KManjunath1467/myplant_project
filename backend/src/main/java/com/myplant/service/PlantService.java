@@ -4,13 +4,15 @@ import com.myplant.dto.PlantDTO;
 import com.myplant.entity.Plant;
 import com.myplant.entity.PlantCareRule;
 import com.myplant.entity.User;
-import com.myplant.exception.ResourceNotFoundException;
 import com.myplant.exception.UnauthorizedException;
 import com.myplant.repository.PlantCareRuleRepository;
 import com.myplant.repository.PlantRepository;
+
 import lombok.AllArgsConstructor;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -18,14 +20,15 @@ import java.util.stream.Collectors;
 
 /**
  * Plant Service
- * 
- * Handles plant management operations.
- * Responsibilities:
- * 1. Create, read, update, delete plants
- * 2. Link plants to plant care rules
- * 3. Security: ensure users can only manage their own plants
- * 4. Convert entities to DTOs
+ *
+ * Handles:
+ * - Create Plant
+ * - Read Plants
+ * - Update Plants
+ * - Delete Plants
+ * - Watering Updates
  */
+
 @Service
 @AllArgsConstructor
 @Transactional
@@ -36,262 +39,306 @@ public class PlantService {
     private final UserService userService;
 
     /**
-     * Create a new plant for a user
-     * 
-     * @param userId the user's ID
-     * @param plantDTO plant information from frontend
-     * @return created plant as DTO
-     * @throws ResourceNotFoundException if plant care rule not found
+     * CREATE PLANT
      */
-    public PlantDTO createPlant(Long userId, PlantDTO plantDTO) {
-        User user = userService.getUserById(userId);
+    public PlantDTO createPlant(PlantDTO dto, User user) {
 
-        Plant plant = new Plant();
-        plant.setUser(user);
-        plant.setName(plantDTO.getName());
-        plant.setPlantType(plantDTO.getPlantType());
-        plant.setHealth(plantDTO.getHealth() != null ? plantDTO.getHealth() : "Healthy");
-        plant.setPotSize(plantDTO.getPotSize());
-        plant.setIsIndoor(plantDTO.getIsIndoor());
-        plant.setLocation(plantDTO.getLocation());
-        plant.setNotes(plantDTO.getNotes());
-        plant.setCustomWateringInterval(plantDTO.getCustomWateringInterval());
-        plant.setLastWateredDate(plantDTO.getLastWateredDate());
-        plant.setCreatedAt(LocalDateTime.now());
-        plant.setUpdatedAt(LocalDateTime.now());
+    Plant plant = new Plant();
 
-        // Link to plant care rule if plant type is provided
-        if (plantDTO.getPlantType() != null) {
-            PlantCareRule careRule = plantCareRuleRepository
-                    .findByPlantName(plantDTO.getPlantType())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Plant care rule", "plantName", plantDTO.getPlantType()));
-            plant.setPlantCareRule(careRule);
-            if (plant.getPotSize() == null) {
-                plant.setPotSize(careRule.getRecommendedPotSize());
-            }
-            if (plant.getIsIndoor() == null) {
-                plant.setIsIndoor(true);
-            }
-            if (plant.getLocation() == null) {
-                plant.setLocation("Indoor shelf");
-            }
-        }
+    plant.setName(dto.getName());
 
-        if (plant.getPotSize() == null) {
-            plant.setPotSize("Medium (6 inches)");
-        }
-        if (plant.getIsIndoor() == null) {
-            plant.setIsIndoor(true);
-        }
-        if (plant.getLocation() == null) {
-            plant.setLocation("Indoor garden");
-        }
+    plant.setPlantType(dto.getPlantType());
 
-        Plant savedPlant = plantRepository.save(plant);
-        return convertToDTO(savedPlant);
-    }
+    plant.setPotSize(dto.getPotSize());
+
+    plant.setIsIndoor(dto.getIsIndoor());
+
+    plant.setLocation(dto.getLocation());
+
+    plant.setNotes(dto.getNotes());
+
+    plant.setCustomWateringInterval(
+            dto.getCustomWateringInterval()
+    );
+
+    plant.setLastWateredDate(LocalDate.now());
+
+    plant.setCreatedAt(LocalDateTime.now());
+
+    plant.setUpdatedAt(LocalDateTime.now());
+
+    plant.setUser(user);
+
+    /*
+     * FIND CARE RULE USING PLANT TYPE
+     */
+    PlantCareRule rule =
+            plantCareRuleRepository
+                    .findByPlantNameIgnoreCase(
+                            dto.getPlantType()
+                    )
+                    .orElse(null);
+
+    /*
+     * ATTACH RULE TO PLANT
+     */
+    plant.setPlantCareRule(rule);
+
+    Plant savedPlant =
+            plantRepository.save(plant);
+
+    return convertToDTO(savedPlant);
+}
 
     /**
-     * Get all plants for a user as entities
-     * Used for scheduler calculations
-     * 
-     * @param userId the user's ID
-     * @return list of user's plant entities
+     * GET ALL USER PLANTS (ENTITY)
      */
     public List<Plant> getUserPlantEntities(Long userId) {
+
         return plantRepository.findByUser_Id(userId);
     }
 
     /**
-     * Get a specific plant (with authorization check)
-     * 
-     * @param userId the user's ID
-     * @param plantId the plant's ID
-     * @return plant as DTO
-     * @throws UnauthorizedException if plant doesn't belong to user
+     * GET ALL USER PLANTS (DTO)
+     */
+    public List<PlantDTO> getUserPlants(Long userId) {
+
+        List<Plant> plants = plantRepository.findByUser_Id(userId);
+
+        return plants.stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * GET SINGLE PLANT
      */
     public PlantDTO getPlant(Long userId, Long plantId) {
-        Plant plant = plantRepository.findByUserAndId(userService.getUserById(userId), plantId)
+
+        Plant plant = plantRepository
+                .findByUserAndId(
+                        userService.getUserById(userId),
+                        plantId
+                )
                 .orElseThrow(() -> new UnauthorizedException(
-                        "This plant does not belong to you or does not exist."));
+                        "This plant does not belong to you or does not exist."
+                ));
+
         return convertToDTO(plant);
     }
 
     /**
-     * Update a plant
-     * 
-     * @param userId the user's ID
-     * @param plantId the plant's ID
-     * @param plantDTO updated plant data
-     * @return updated plant as DTO
+     * UPDATE PLANT
      */
-    public PlantDTO updatePlant(Long userId, Long plantId, PlantDTO plantDTO) {
+    public PlantDTO updatePlant(
+            Long userId,
+            Long plantId,
+            PlantDTO plantDTO
+    ) {
+
         User user = userService.getUserById(userId);
-        Plant plant = plantRepository.findByUserAndId(user, plantId)
+
+        Plant plant = plantRepository
+                .findByUserAndId(user, plantId)
                 .orElseThrow(() -> new UnauthorizedException(
-                        "This plant does not belong to you or does not exist."));
+                        "This plant does not belong to you or does not exist."
+                ));
 
         plant.setName(plantDTO.getName());
         plant.setPlantType(plantDTO.getPlantType());
+
         plant.setPotSize(plantDTO.getPotSize());
         plant.setIsIndoor(plantDTO.getIsIndoor());
+
         plant.setLocation(plantDTO.getLocation());
+
         plant.setNotes(plantDTO.getNotes());
-        plant.setCustomWateringInterval(plantDTO.getCustomWateringInterval());
+
+        plant.setCustomWateringInterval(
+                plantDTO.getCustomWateringInterval()
+        );
+
         plant.setUpdatedAt(LocalDateTime.now());
 
-        // Update plant care rule if plant type changed
-        if (plantDTO.getPlantType() != null) {
-            PlantCareRule careRule = plantCareRuleRepository
-                    .findByPlantName(plantDTO.getPlantType())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Plant care rule", "plantName", plantDTO.getPlantType()));
-            plant.setPlantCareRule(careRule);
-        }
-
         Plant updatedPlant = plantRepository.save(plant);
+
         return convertToDTO(updatedPlant);
     }
 
     /**
-     * Delete a plant
-     * 
-     * @param userId the user's ID
-     * @param plantId the plant's ID
-     * @throws UnauthorizedException if plant doesn't belong to user
+     * DELETE PLANT
      */
     public void deletePlant(Long userId, Long plantId) {
+
         User user = userService.getUserById(userId);
-        Plant plant = plantRepository.findByUserAndId(user, plantId)
+
+        Plant plant = plantRepository
+                .findByUserAndId(user, plantId)
                 .orElseThrow(() -> new UnauthorizedException(
-                        "This plant does not belong to you or does not exist."));
-        
+                        "This plant does not belong to you or does not exist."
+                ));
+
         plantRepository.delete(plant);
     }
 
     /**
-     * Mark plant as watered
-     * Updates the last watered date
-     * 
-     * @param userId the user's ID
-     * @param plantId the plant's ID
-     * @return updated plant as DTO
+     * MARK AS WATERED
      */
     public PlantDTO markAsWatered(Long userId, Long plantId) {
+
         User user = userService.getUserById(userId);
-        Plant plant = plantRepository.findByUserAndId(user, plantId)
+
+        Plant plant = plantRepository
+                .findByUserAndId(user, plantId)
                 .orElseThrow(() -> new UnauthorizedException(
-                        "This plant does not belong to you or does not exist."));
-        
+                        "This plant does not belong to you or does not exist."
+                ));
+
         plant.setLastWateredDate(LocalDate.now());
+
         plant.setUpdatedAt(LocalDateTime.now());
-        
+
         Plant updatedPlant = plantRepository.save(plant);
+
         return convertToDTO(updatedPlant);
     }
 
     /**
-     * Update plant health status
-     * 
-     * @param userId the user's ID
-     * @param plantId the plant's ID
-     * @param health new health status (Healthy, Fair, Poor)
-     * @return updated plant as DTO
+     * UPDATE HEALTH
      */
-    public PlantDTO updatePlantHealth(Long userId, Long plantId, String health) {
+    public PlantDTO updatePlantHealth(
+            Long userId,
+            Long plantId,
+            String health
+    ) {
+
         User user = userService.getUserById(userId);
-        Plant plant = plantRepository.findByUserAndId(user, plantId)
+
+        Plant plant = plantRepository
+                .findByUserAndId(user, plantId)
                 .orElseThrow(() -> new UnauthorizedException(
-                        "This plant does not belong to you or does not exist."));
-        
+                        "This plant does not belong to you or does not exist."
+                ));
+
         plant.setHealth(health);
+
         plant.setUpdatedAt(LocalDateTime.now());
-        
+
         Plant updatedPlant = plantRepository.save(plant);
+
         return convertToDTO(updatedPlant);
     }
 
     /**
-     * Convert Plant entity to PlantDTO
-     * 
-     * @param plant the plant entity
-     * @return DTO with plant info
+     * ENTITY -> DTO
      */
     private PlantDTO convertToDTO(Plant plant) {
+
         PlantDTO dto = new PlantDTO();
+
         dto.setId(plant.getId());
+
         dto.setName(plant.getName());
+
         dto.setPlantType(plant.getPlantType());
+
         dto.setPotSize(plant.getPotSize());
+
         dto.setIsIndoor(plant.getIsIndoor());
+
         dto.setLocation(plant.getLocation());
+
         dto.setLastWateredDate(plant.getLastWateredDate());
+
         dto.setWateringStreak(plant.getWateringStreak());
+
         dto.setHealth(plant.getHealth());
+
         dto.setNotes(plant.getNotes());
-        dto.setCustomWateringInterval(plant.getCustomWateringInterval());
+
+        dto.setCustomWateringInterval(
+                plant.getCustomWateringInterval()
+        );
+
         dto.setCreatedAt(plant.getCreatedAt());
+
         dto.setUpdatedAt(plant.getUpdatedAt());
 
+        /*
+         * OPTIONAL RULE DATA
+         */
         if (plant.getPlantCareRule() != null) {
-            dto.setPlantCareRuleId(plant.getPlantCareRule().getId());
-            dto.setCareRuleDescription(plant.getPlantCareRule().getDescription());
-            dto.setBaseWateringDays(plant.getPlantCareRule().getBaseWateringDays());
-            dto.setWateringFrequency(plant.getPlantCareRule().getWateringFrequency());
-            dto.setSunlightNeeds(plant.getPlantCareRule().getSunlightNeeds());
-            dto.setHumidityPreference(plant.getPlantCareRule().getHumidityPreference());
-            dto.setTemperatureRange(plant.getPlantCareRule().getTemperatureRange());
-            dto.setDifficultyLevel(plant.getPlantCareRule().getDifficultyLevel());
-            dto.setRecommendedPotSize(plant.getPlantCareRule().getRecommendedPotSize());
-            dto.setGrowthRate(plant.getPlantCareRule().getGrowthRate());
-            dto.setMaxSize(plant.getPlantCareRule().getMaxSize());
-            dto.setCareTips(plant.getPlantCareRule().getCareTips());
+
+            PlantCareRule rule = plant.getPlantCareRule();
+
+            dto.setPlantCareRuleId(rule.getId());
+
+            dto.setCareRuleDescription(rule.getDescription());
+
+            dto.setBaseWateringDays(rule.getBaseWateringDays());
+
+            dto.setWateringFrequency(rule.getWateringFrequency());
+
+            dto.setSunlightNeeds(rule.getSunlightNeeds());
+
+            dto.setHumidityPreference(rule.getHumidityPreference());
+
+            dto.setTemperatureRange(rule.getTemperatureRange());
+
+            dto.setDifficultyLevel(rule.getDifficultyLevel());
+
+            dto.setRecommendedPotSize(
+                    rule.getRecommendedPotSize()
+            );
+
+            dto.setGrowthRate(rule.getGrowthRate());
+
+            dto.setMaxSize(rule.getMaxSize());
+
+            dto.setCareTips(rule.getCareTips());
         }
 
         return dto;
     }
 
     /**
-     * Convert PlantDTO to Plant entity
-     * Used for scheduler calculations
-     * 
-     * @param plantDTO the plant DTO
-     * @return Plant entity
+     * DTO -> ENTITY
      */
     public Plant convertToEntity(PlantDTO plantDTO) {
-        Plant plant = new Plant();
-        plant.setId(plantDTO.getId());
-        plant.setName(plantDTO.getName());
-        plant.setPlantType(plantDTO.getPlantType());
-        plant.setPotSize(plantDTO.getPotSize());
-        plant.setIsIndoor(plantDTO.getIsIndoor());
-        plant.setLocation(plantDTO.getLocation());
-        plant.setLastWateredDate(plantDTO.getLastWateredDate());
-        plant.setWateringStreak(plantDTO.getWateringStreak());
-        plant.setHealth(plantDTO.getHealth());
-        plant.setNotes(plantDTO.getNotes());
-        plant.setCustomWateringInterval(plantDTO.getCustomWateringInterval());
-        plant.setCreatedAt(plantDTO.getCreatedAt());
-        plant.setUpdatedAt(plantDTO.getUpdatedAt());
 
-        // Set plant care rule from partial DTO data if available
-        if (plantDTO.getPlantCareRuleId() != null || plantDTO.getBaseWateringDays() != null) {
-            PlantCareRule careRule = new PlantCareRule();
-            careRule.setId(plantDTO.getPlantCareRuleId());
-            careRule.setPlantName(plantDTO.getPlantType());
-            careRule.setBaseWateringDays(plantDTO.getBaseWateringDays());
-            careRule.setWateringFrequency(plantDTO.getWateringFrequency());
-            careRule.setSunlightNeeds(plantDTO.getSunlightNeeds());
-            careRule.setHumidityPreference(plantDTO.getHumidityPreference());
-            careRule.setTemperatureRange(plantDTO.getTemperatureRange());
-            careRule.setDifficultyLevel(plantDTO.getDifficultyLevel());
-            careRule.setRecommendedPotSize(plantDTO.getRecommendedPotSize());
-            careRule.setGrowthRate(plantDTO.getGrowthRate());
-            careRule.setMaxSize(plantDTO.getMaxSize());
-            careRule.setCareTips(plantDTO.getCareTips());
-            plant.setPlantCareRule(careRule);
-        }
+        Plant plant = new Plant();
+
+        plant.setId(plantDTO.getId());
+
+        plant.setName(plantDTO.getName());
+
+        plant.setPlantType(plantDTO.getPlantType());
+
+        plant.setPotSize(plantDTO.getPotSize());
+
+        plant.setIsIndoor(plantDTO.getIsIndoor());
+
+        plant.setLocation(plantDTO.getLocation());
+
+        plant.setLastWateredDate(
+                plantDTO.getLastWateredDate()
+        );
+
+        plant.setWateringStreak(
+                plantDTO.getWateringStreak()
+        );
+
+        plant.setHealth(plantDTO.getHealth());
+
+        plant.setNotes(plantDTO.getNotes());
+
+        plant.setCustomWateringInterval(
+                plantDTO.getCustomWateringInterval()
+        );
+
+        plant.setCreatedAt(plantDTO.getCreatedAt());
+
+        plant.setUpdatedAt(plantDTO.getUpdatedAt());
 
         return plant;
     }

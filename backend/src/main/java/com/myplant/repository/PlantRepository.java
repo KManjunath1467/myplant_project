@@ -26,6 +26,7 @@ public interface PlantRepository extends JpaRepository<Plant, Long> {
      * @return list of plants owned by the user
      */
     List<Plant> findByUser(User user);
+    List<Plant> findByUserId(Long userId);
 
     /**
      * Find a specific plant by ID and user (security check)

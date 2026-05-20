@@ -4,16 +4,13 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * Plant Entity - Represents a plant belonging to a user
- * 
- * This class maps to the 'plants' table in the database.
- * It stores information about each plant like name, type, location,
- * and watering history to provide smart watering recommendations.
+ * Plant Entity
  */
 @Entity
 @Table(name = "plants")
@@ -26,59 +23,72 @@ public class Plant {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Reference to the plant owner
+    // Reference to owner
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    // Plant basic information
+    // Plant Name
     @Column(nullable = false)
-    private String name; // e.g., "My Snake Plant", "Office Pothos"
+    private String name;
 
+    // Plant Type
     @Column(nullable = false)
-    private String plantType; // e.g., "Snake Plant", "Pothos", "Monstera"
+    private String plantType;
 
-    // Pot/Container information
+    // Pot Size
     @Column(nullable = false)
-    private String potSize; // e.g., "Small (4 inches)", "Medium (6 inches)", "Large (8+ inches)"
+    private String potSize;
 
-    // Location information
+    // Indoor / Outdoor
     @Column(nullable = false)
-    private Boolean isIndoor; // true = indoor, false = outdoor
+    private Boolean isIndoor;
 
+    // Plant Location
     @Column(nullable = false)
-    private String location; // e.g., "Living Room", "Bedroom", "Office"
+    private String location;
 
-    // Last watering information
+    // Last Watered Date
     private LocalDate lastWateredDate;
 
-    // Watering streak tracking (motivation feature)
+    // Watering Streak
     @Column(nullable = false)
-    private Integer wateringStreak = 0; // Number of consecutive on-time waterings
+    private Integer wateringStreak = 0;
 
-    // Plant health status
+    // Plant Health
     @Column(nullable = false)
-    private String health = "Healthy"; // Healthy, Fair, Poor
+    private String health = "Healthy";
 
-    // Notes about the plant
+    // Notes
     @Column(columnDefinition = "TEXT")
     private String notes;
 
-    // Custom watering interval (in days) - if user wants to override default
+    // Custom Watering Interval
     private Integer customWateringInterval;
 
-    // Timestamps
+    // Image URL
+    @Column(name = "image_url")
+    private String imageUrl;
+
+    // Created At
     @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt =
+            LocalDateTime.now();
 
+    // Updated At
     @Column(nullable = false)
-    private LocalDateTime updatedAt = LocalDateTime.now();
+    private LocalDateTime updatedAt =
+            LocalDateTime.now();
 
-    // One plant can have many watering history records
-    @OneToMany(mappedBy = "plant", cascade = CascadeType.ALL, orphanRemoval = true)
+    // Watering History
+    @OneToMany(
+            mappedBy = "plant",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
     private List<WateringHistory> wateringHistory;
 
-    // Many plants can reference one plant care rule
+    // Plant Care Rule
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "plant_care_rule_id")
     private PlantCareRule plantCareRule;

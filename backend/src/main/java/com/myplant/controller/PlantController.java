@@ -1,13 +1,18 @@
 package com.myplant.controller;
 
 import com.myplant.dto.PlantDTO;
+import com.myplant.entity.Plant;
 import com.myplant.entity.User;
+import com.myplant.repository.PlantRepository;
 import com.myplant.security.JwtTokenProvider;
 import com.myplant.service.PlantService;
 import com.myplant.service.UserService;
-
+import org.springframework.web.multipart.MultipartFile;
+import java.nio.file.*;
+import java.io.IOException;
 import lombok.AllArgsConstructor;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -38,9 +43,49 @@ public class PlantController {
     private final JwtTokenProvider jwtTokenProvider;
     private final UserService userService;
 
+    @Autowired
+private PlantRepository plantRepository;
+
     /**
      * Get all plants for current user
      */
+    @PostMapping("/{id}/upload-image")
+public ResponseEntity<?> uploadImage(
+        @PathVariable Long id,
+        @RequestParam("image") MultipartFile file
+) {
+
+    try {
+
+        Plant plant = plantRepository.findById(id).orElseThrow();
+
+        String uploadDir = "uploads/";
+
+        String fileName =
+                System.currentTimeMillis()
+                + "_"
+                + file.getOriginalFilename();
+
+        Path filePath = Paths.get(uploadDir, fileName);
+
+        Files.createDirectories(filePath.getParent());
+
+        Files.write(filePath, file.getBytes());
+
+        plant.setImageUrl(
+                "http://localhost:8081/uploads/" + fileName
+        );
+
+        plantRepository.save(plant);
+
+        return ResponseEntity.ok(plant);
+
+    } catch (IOException e) {
+
+        return ResponseEntity.internalServerError()
+                .body("Upload failed");
+    }
+}
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<PlantDTO>> getUserPlants(

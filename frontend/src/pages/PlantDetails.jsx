@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import axios from "axios"
+
+import { getWeatherData } from '../services/weatherService'
 
 import {
   plantsApi,
@@ -13,7 +16,7 @@ import StatsCard from '../components/StatsCard'
 
 import {
   ArrowLeft,
-  Edit,
+ Edit,
   Droplet,
   Sun,
   TrendingUp
@@ -24,6 +27,7 @@ export default function PlantDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
 
+  // Plant Data
   const [plant, setPlant] = useState(null)
   const [wateringHistory, setWateringHistory] = useState([])
   const [loading, setLoading] = useState(true)
@@ -31,12 +35,20 @@ export default function PlantDetails() {
   // AI Prediction
   const [aiPrediction, setAiPrediction] = useState("Loading...")
 
+  // Weather
+  const [weather, setWeather] = useState(null)
+
+  // Image Upload
+  const [selectedImage, setSelectedImage] = useState(null)
+
+  // Load Data
   useEffect(() => {
 
     loadPlantData()
 
   }, [id])
 
+  // Load Plant Data
   const loadPlantData = async () => {
 
     try {
@@ -57,7 +69,10 @@ export default function PlantDetails() {
 
     } catch (err) {
 
-      console.error("Failed to load plant data:", err)
+      console.error(
+        "Failed to load plant data:",
+        err
+      )
 
       setAiPrediction("Error")
 
@@ -68,31 +83,95 @@ export default function PlantDetails() {
     }
   }
 
-  // AI Function
+  // Upload Plant Image
+  const uploadPlantImage = async () => {
+
+    if (!selectedImage) {
+
+      alert("Please select an image")
+
+      return
+    }
+
+    const formData = new FormData()
+
+    formData.append("image", selectedImage)
+
+    try {
+
+      await axios.post(
+
+        `http://localhost:8081/api/plants/${id}/upload-image`,
+
+        formData,
+
+        {
+          headers: {
+            "Content-Type": "multipart/form-data"
+          }
+        }
+      )
+
+      alert("Image uploaded successfully")
+
+      window.location.reload()
+
+    } catch (error) {
+
+      console.error(error)
+
+      alert("Upload failed")
+    }
+  }
+
+  // AI + Weather Prediction
   const loadPrediction = async () => {
 
     try {
 
+      console.log("Fetching Weather Data...")
+
+      // Change city if needed
+      const weatherData =
+        await getWeatherData("Bangalore")
+
+      console.log("WEATHER:", weatherData)
+
+      setWeather(weatherData)
+
+      const temperature =
+        weatherData.temperature
+
+      const humidity =
+        weatherData.humidity
+
       console.log("Calling Flask AI API...")
 
       const response = await fetch(
-        "http://127.0.0.1:5000/predict?temperature=35&humidity=30&plantType=0"
+
+        `http://127.0.0.1:5000/predict?temperature=${temperature}&humidity=${humidity}&plantType=0`
+
       )
 
       const data = await response.json()
 
       console.log("AI RESPONSE:", data)
 
-      if (data.recommendedWateringDays !== undefined) {
+      if (
+        data.recommendedWateringDays !== undefined
+      ) {
 
         setAiPrediction(
-          Number(data.recommendedWateringDays).toFixed(1)
+
+          Number(
+            data.recommendedWateringDays
+          ).toFixed(1)
+
         )
 
       } else {
 
         setAiPrediction("No Data")
-
       }
 
     } catch (error) {
@@ -100,10 +179,10 @@ export default function PlantDetails() {
       console.log("AI ERROR:", error)
 
       setAiPrediction("Error")
-
     }
   }
 
+  // Mark Plant Watered
   const handleWater = async () => {
 
     try {
@@ -114,16 +193,24 @@ export default function PlantDetails() {
 
     } catch (err) {
 
-      console.error("Failed to mark as watered:", err)
-
+      console.error(
+        "Failed to mark as watered:",
+        err
+      )
     }
   }
 
-  if (loading) return <Loader />
+  // Loading Screen
+  if (loading) {
 
+    return <Loader />
+  }
+
+  // Plant Not Found
   if (!plant) {
 
     return (
+
       <div className="min-h-screen bg-gradient-to-br from-bg via-soft to-sage/20">
 
         <Navbar />
@@ -137,11 +224,15 @@ export default function PlantDetails() {
             <div className="text-center py-12">
 
               <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+
                 Plant Not Found
+
               </h2>
 
               <p className="text-gray-600">
+
                 The plant you're looking for doesn't exist.
+
               </p>
 
             </div>
@@ -154,7 +245,9 @@ export default function PlantDetails() {
     )
   }
 
+  // Dashboard Stats
   const stats = [
+
     {
       title: 'Days Since Last Water',
       value: plant.daysSinceLastWater || 3,
@@ -162,6 +255,7 @@ export default function PlantDetails() {
       icon: Droplet,
       color: 'sky'
     },
+
     {
       title: 'Total Waterings',
       value: wateringHistory.length,
@@ -169,6 +263,7 @@ export default function PlantDetails() {
       icon: TrendingUp,
       color: 'primary'
     },
+
     {
       title: 'Health Score',
       value: '85%',
@@ -207,11 +302,15 @@ export default function PlantDetails() {
                 <div>
 
                   <h1 className="text-3xl font-bold text-gray-900 mb-2">
+
                     {plant.name}
+
                   </h1>
 
                   <p className="text-gray-600">
+
                     {plant.plantType}
+
                   </p>
 
                 </div>
@@ -221,7 +320,9 @@ export default function PlantDetails() {
               <div className="flex gap-3">
 
                 <button
-                  onClick={() => navigate(`/plants/${id}/edit`)}
+                  onClick={() =>
+                    navigate(`/plants/${id}/edit`)
+                  }
                   className="btn-secondary flex items-center gap-2"
                 >
                   <Edit className="w-4 h-4" />
@@ -244,8 +345,92 @@ export default function PlantDetails() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
 
               {stats.map((stat, index) => (
-                <StatsCard key={index} {...stat} />
+
+                <StatsCard
+                  key={index}
+                  {...stat}
+                />
+
               ))}
+
+            </div>
+
+            {/* Weather Card */}
+            {weather && (
+
+              <div className="bg-white p-5 rounded-2xl shadow-sm mb-8">
+
+                <h2 className="text-xl font-bold text-gray-800 mb-3">
+
+                  Live Weather Data 🌦️
+
+                </h2>
+
+                <div className="flex gap-10">
+
+                  <p className="text-gray-700">
+
+                    🌡️ Temperature:
+                    <strong>
+                      {" "}
+                      {weather.temperature}°C
+                    </strong>
+
+                  </p>
+
+                  <p className="text-gray-700">
+
+                    💧 Humidity:
+                    <strong>
+                      {" "}
+                      {weather.humidity}%
+                    </strong>
+
+                  </p>
+
+                </div>
+
+              </div>
+
+            )}
+
+            {/* Plant Image Upload */}
+            <div className="bg-white rounded-3xl p-6 mb-8 shadow-sm">
+
+              <h2 className="text-2xl font-bold mb-4">
+
+                Plant Image 🌱
+
+              </h2>
+
+              <img
+                src={
+                  plant.imageUrl
+                    ? plant.imageUrl
+                    : "https://images.unsplash.com/photo-1501004318641-b39e6451bec6"
+                }
+                alt="Plant"
+                className="w-72 h-72 object-cover rounded-2xl mb-4"
+              />
+
+              <input
+                type="file"
+                onChange={(e) =>
+                  setSelectedImage(
+                    e.target.files[0]
+                  )
+                }
+                className="mb-4"
+              />
+
+              <br />
+
+              <button
+                onClick={uploadPlantImage}
+                className="bg-green-600 text-white px-5 py-2 rounded-xl"
+              >
+                Upload Plant Image
+              </button>
 
             </div>
 
@@ -253,7 +438,9 @@ export default function PlantDetails() {
             <div className="bg-blue-100 p-5 rounded-2xl mb-8">
 
               <h2 className="text-xl font-bold text-blue-800 mb-2">
+
                 AI Smart Watering Prediction
+
               </h2>
 
               <p className="text-blue-700">
